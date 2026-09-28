@@ -2238,7 +2238,9 @@
     let renderFrame = null;
     const preloadDistance = 14000;
     const unloadDistance = 26000;
-
+    const reducedQualityQuery = window.matchMedia('(max-width: 1024px)');
+    let reducedImageQuality = reducedQualityQuery.matches;
+    
     function requestRender() {
       if (renderRunning) return;
       renderRunning = true;
@@ -2252,12 +2254,50 @@
       if (!image) return;
 
       card.imageLoading = true;
-      image.src = card.image.src;
+      const useOriginal = () => {
+        image.src = card.image.src;
+        image.decode?.().catch(() => {}).finally(() => {
+          card.imageLoaded = true;
+          card.imageLoading = false;
+        });
+      };
 
-      image.decode?.().catch(() => {}).finally(() => {
-        card.imageLoaded = true;
-        card.imageLoading = false;
-      });
+      if (!reducedImageQuality) {
+        useOriginal();
+        return;
+      }
+
+      const source = new Image();
+      source.onload = () => {
+        const maxDimension = 900;
+        const scale = Math.min(1, maxDimension / Math.max(source.naturalWidth, source.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(source.naturalWidth * scale);
+        canvas.height = Math.round(source.naturalHeight * scale);
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+          useOriginal();
+          return;
+        }
+
+        context.drawImage(source, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          if (!blob) {
+            useOriginal();
+            return;
+          }
+
+          card.previewUrl = URL.createObjectURL(blob);
+          image.src = card.previewUrl;
+          image.decode?.().catch(() => {}).finally(() => {
+            card.imageLoaded = true;
+            card.imageLoading = false;
+          });
+        }, 'image/jpeg', 0.55);
+      };
+      source.onerror = useOriginal;
+      source.src = card.image.src;
     }
 
     function unloadCardImage(card) {
@@ -2267,6 +2307,10 @@
       if (!image) return;
 
       image.removeAttribute('src');
+      if (card.previewUrl) {
+        URL.revokeObjectURL(card.previewUrl);
+        card.previewUrl = null;
+      }
       card.imageLoaded = false;
       card.imageLoading = false;
     }
@@ -2383,6 +2427,25 @@
     function resize() {
       viewportWidth = window.innerWidth;
       viewportHeight = window.innerHeight;
+
+      const shouldReduceQuality = reducedQualityQuery.matches;
+      if (shouldReduceQuality !== reducedImageQuality) {
+        reducedImageQuality = shouldReduceQuality;
+        cards.forEach(card => {
+          if (!card.imageLoaded) return;
+
+          const image = card.element.querySelector('img');
+          if (image) image.removeAttribute('src');
+          if (card.previewUrl) {
+            URL.revokeObjectURL(card.previewUrl);
+            card.previewUrl = null;
+          }
+          card.imageLoaded = false;
+          card.imageLoading = false;
+          loadCardImage(card);
+        });
+      }
+
       limitMapPan();
       requestRender();
     }
