@@ -638,126 +638,6 @@
     }
 
     /* =========================
-       PANTALLA DE CARGA
-    ========================= */
-
-    .loading-screen {
-      position: fixed;
-      inset: 0;
-      z-index: 1100;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      background: var(--paper);
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transition: opacity .55s ease, visibility .55s ease;
-    }
-
-    .loading-screen.active {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-    }
-
-    .loading-panel {
-      width: min(440px, 100%);
-      text-align: center;
-    }
-
-    .loading-kicker,
-    .loading-count {
-      font-size: 9px;
-      letter-spacing: 2px;
-      opacity: .65;
-    }
-
-    .loading-title {
-      margin: 13px 0 34px;
-      font-size: clamp(15px, 3vw, 21px);
-      font-weight: normal;
-      letter-spacing: 3px;
-    }
-
-    .flight-track {
-      position: relative;
-      height: 34px;
-      margin: 0 2px 13px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .flight-track::before,
-    .flight-track::after {
-      position: absolute;
-      bottom: -3px;
-      width: 5px;
-      height: 5px;
-      border: 1px solid var(--ink);
-      border-radius: 50%;
-      background: var(--paper);
-      content: "";
-    }
-
-    .flight-track::before { left: 0; }
-    .flight-track::after { right: 0; }
-
-    .flight-progress {
-      position: absolute;
-      left: 0;
-      right: 100%;
-      bottom: -1px;
-      height: 1px;
-      background: #3f8f5f;
-      transition: right .3s ease;
-    }
-
-    .flight-plane {
-      position: absolute;
-      left: 0;
-      bottom: 4px;
-      z-index: 1;
-      font-size: 23px;
-      line-height: 1;
-      transform: translate(-50%, 0) rotate(0deg);
-      transition: left .3s ease, transform .35s ease;
-      will-change: left, transform;
-    }
-
-    .loading-screen.landing .flight-plane {
-      transform: translate(-50%, 0) rotate(12deg);
-    }
-
-    .loading-screen.takeoff .flight-plane {
-      animation: planeTakeoff .7s ease-out both;
-    }
-
-    @keyframes planeTakeoff {
-      from { transform: translate(-50%, 8px) rotate(-12deg); }
-      to { transform: translate(-50%, 0) rotate(0deg); }
-    }
-
-    .loading-count {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .loading-percent {
-      color: #3f8f5f;
-      opacity: 1;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .loading-screen,
-      .flight-progress,
-      .flight-plane {
-        transition-duration: .01ms;
-        animation-duration: .01ms;
-      }
-    }
-
-    /* =========================
        VENTANA MODAL
     ========================= */
 
@@ -824,6 +704,7 @@
     }
 
     .modal-img-container {
+      position: relative;
       width: 100%;
       max-height: 70vh;
       display: flex;
@@ -833,6 +714,46 @@
       border: 1px solid var(--line);
       padding: 12px;
       margin-bottom: 14px;
+    }
+
+    .sequence-control {
+      position: absolute;
+      top: 50%;
+      z-index: 2;
+      width: 34px;
+      height: 34px;
+      transform: translateY(-50%);
+      border: 1px solid var(--ink);
+      background: rgba(214,208,196,.88);
+      color: var(--ink);
+      font: inherit;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .sequence-control:hover {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .sequence-control[hidden],
+    .sequence-count[hidden] {
+      display: none;
+    }
+
+    .sequence-prev { left: 16px; }
+    .sequence-next { right: 16px; }
+
+    .sequence-count {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      z-index: 2;
+      transform: translateX(-50%);
+      padding: 5px 8px;
+      background: rgba(214,208,196,.88);
+      font-size: 9px;
+      letter-spacing: 1px;
     }
 
     .modal-img-container img {
@@ -1319,25 +1240,6 @@
 
 
   <!-- =========================
-       PANTALLA DE CARGA
-  ========================= -->
-
-  <section class="loading-screen" id="loadingScreen" aria-hidden="true" aria-live="polite">
-    <div class="loading-panel">
-      <div class="loading-kicker">BAV / PHOTOGRAPHIC ARCHIVE</div>
-      <h1 class="loading-title" id="loadingTitle">PREPARING FLIGHT</h1>
-      <div class="flight-track" role="progressbar" aria-label="Carga de fotografías" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="flightTrack">
-        <div class="flight-progress" id="flightProgress"></div>
-        <span class="flight-plane" id="flightPlane" aria-hidden="true">✈</span>
-      </div>
-      <div class="loading-count">
-        <span id="loadingCount">LOADING FRAMES 0 / 0</span>
-        <span class="loading-percent" id="loadingPercent">0%</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- =========================
        VENTANA MODAL
   ========================= -->
 
@@ -1352,6 +1254,9 @@
 
       <div class="modal-img-container">
         <img id="modalImg" src="" alt="Fotografía ampliada">
+        <button class="sequence-control sequence-prev" id="sequencePrev" type="button" aria-label="Foto anterior" hidden>‹</button>
+        <span class="sequence-count" id="sequenceCount" aria-live="polite" hidden></span>
+        <button class="sequence-control sequence-next" id="sequenceNext" type="button" aria-label="Foto siguiente" hidden>›</button>
       </div>
 
       <div class="modal-title" id="modalTitle">
@@ -1423,45 +1328,8 @@
       }, 1800);
     }
 
-    async function preloadArchiveImages(photos, onProgress) {
-      let nextIndex = 0;
-      let completed = 0;
-      const concurrency = Math.min(4, photos.length);
-
-      const worker = async () => {
-        while (nextIndex < photos.length) {
-          const photo = photos[nextIndex++];
-          await new Promise(resolve => {
-            const image = new Image();
-            image.onload = resolve;
-            image.onerror = resolve;
-            image.src = photo.src;
-            if (image.complete) resolve();
-          });
-          completed++;
-          onProgress(completed, photos.length);
-        }
-      };
-
-      await Promise.all(
-        Array.from({ length: concurrency }, () => worker())
-      );
-    }
-
-    async function enterArchive(name, archiveNumber, photos) {
-      if (loadingScreen.classList.contains('active')) return;
-
+    function enterArchive(name, archiveNumber, photos) {
       clearTimeout(mapStatusResetTimer);
-      loadingTitle.textContent = `${name} / PREPARING FLIGHT`;
-      loadingScreen.classList.remove('landing');
-      loadingScreen.classList.add('active', 'takeoff');
-      loadingScreen.setAttribute('aria-hidden', 'false');
-      updateLoadingProgress(0, photos.length);
-      setTimeout(() => loadingScreen.classList.remove('takeoff'), 750);
-
-      await preloadArchiveImages(photos, updateLoadingProgress);
-      loadingScreen.classList.add('landing');
-      await new Promise(resolve => setTimeout(resolve, 650));
 
       activePhotos = photos;
       rebuildPhotoSpace();
@@ -1477,8 +1345,6 @@
       }
 
       document.body.classList.add('archive-open');
-      loadingScreen.classList.remove('active');
-      loadingScreen.setAttribute('aria-hidden', 'true');
 
       mapStatus.innerHTML = `
         ${name} / ARCHIVE ${archiveNumber}
@@ -1922,6 +1788,16 @@
       {
         id: 'JP-053',
         src: 'img/japan/canon37.jpg',
+        sequence: [
+          { id: 'JP-053', src: 'img/japan/canon37.jpg' },
+          { id: 'JP-054', src: 'img/japan/canon38.jpg' },
+          { id: 'JP-055', src: 'img/japan/canon39.jpg' },
+          { id: 'JP-056', src: 'img/japan/canon40.jpg' },
+          { id: 'JP-057', src: 'img/japan/canon41.jpg' },
+          { id: 'JP-058', src: 'img/japan/canon42.jpg' },
+          { id: 'JP-059', src: 'img/japan/canon43.jpg' },
+          { id: 'JP-060', src: 'img/japan/canon44.jpg' }
+        ],
         phrase: '#',
         location: 'TOKYO, JAPAN',
         date: '24 AUG 2026',
@@ -1929,62 +1805,6 @@
       },
       {
         id: 'JP-054',
-        src: 'img/japan/canon38.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-055',
-        src: 'img/japan/canon39.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-056',
-        src: 'img/japan/canon40.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-057',
-        src: 'img/japan/canon41.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-058',
-        src: 'img/japan/canon42.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-059',
-        src: 'img/japan/canon43.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-060',
-        src: 'img/japan/canon44.jpg',
-        phrase: '#',
-        location: 'TOKYO, JAPAN',
-        date: '24 AUG 2026',
-        camera: 'CANON 2000D · 36MM'
-      },
-      {
-        id: 'JP-061',
         src: 'img/japan/canon45.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -1992,7 +1812,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-062',
+        id: 'JP-055',
         src: 'img/japan/canon46.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2000,7 +1820,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-063',
+        id: 'JP-056',
         src: 'img/japan/canon47.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2008,7 +1828,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-064',
+        id: 'JP-057',
         src: 'img/japan/canon48.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2016,7 +1836,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-065',
+        id: 'JP-058',
         src: 'img/japan/canon49.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2024,7 +1844,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-066',
+        id: 'JP-059',
         src: 'img/japan/canon50.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2032,7 +1852,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-067',
+        id: 'JP-060',
         src: 'img/japan/canon51.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2040,7 +1860,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-068',
+        id: 'JP-061',
         src: 'img/japan/canon52.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2048,7 +1868,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-069',
+        id: 'JP-062',
         src: 'img/japan/canon53.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2056,7 +1876,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-070',
+        id: 'JP-063',
         src: 'img/japan/canon54.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2064,7 +1884,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-071',
+        id: 'JP-064',
         src: 'img/japan/canon55.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2072,7 +1892,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-072',
+        id: 'JP-065',
         src: 'img/japan/canon56.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2080,7 +1900,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-073',
+        id: 'JP-066',
         src: 'img/japan/canon57.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2088,7 +1908,7 @@
         camera: 'CANON 2000D · 36MM'
       },
       {
-        id: 'JP-074',
+        id: 'JP-067',
         src: 'img/japan/canon58.jpg',
         phrase: '#',
         location: 'TOKYO, JAPAN',
@@ -2167,22 +1987,6 @@
     const modeToggle = document.querySelector('#modeToggle');
     const goBackButton = document.querySelector('#goBackButton');
     const hint = document.querySelector('#hint');
-    const loadingScreen = document.querySelector('#loadingScreen');
-    const loadingTitle = document.querySelector('#loadingTitle');
-    const loadingCount = document.querySelector('#loadingCount');
-    const loadingPercent = document.querySelector('#loadingPercent');
-    const flightTrack = document.querySelector('#flightTrack');
-    const flightProgress = document.querySelector('#flightProgress');
-    const flightPlane = document.querySelector('#flightPlane');
-
-    function updateLoadingProgress(completed, total) {
-      const percent = total ? Math.round((completed / total) * 100) : 100;
-      loadingCount.textContent = `LOADING FRAMES ${completed} / ${total}`;
-      loadingPercent.textContent = `${percent}%`;
-      flightTrack.setAttribute('aria-valuenow', percent);
-      flightProgress.style.right = `${100 - percent}%`;
-      flightPlane.style.left = `${percent}%`;
-    }
 
     const photoModal = document.querySelector('#photoModal');
     const modalOverlay = document.querySelector('#modalOverlay');
@@ -2193,6 +1997,12 @@
     const modalLoc = document.querySelector('#modalLoc');
     const modalDate = document.querySelector('#modalDate');
     const modalCam = document.querySelector('#modalCam');
+    const sequencePrev = document.querySelector('#sequencePrev');
+    const sequenceNext = document.querySelector('#sequenceNext');
+    const sequenceCount = document.querySelector('#sequenceCount');
+
+    let modalSequence = [];
+    let modalSequenceIndex = 0;
 
     const mapContainer = document.querySelector('.map-container');
     const mapZoomIn = document.querySelector('#mapZoomIn');
@@ -2665,21 +2475,30 @@
        MODAL
     ========================= */
 
-    function openModal(cardData) {
-
+    function showModalSequenceFrame() {
+      const frame = modalSequence[modalSequenceIndex];
       modalImg.onerror = () => {
         modalImg.onerror = null;
         modalImg.src =
           `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="#3e4140"/><text x="300" y="375" fill="#d6d0c4" font-family="Courier New, monospace" font-size="32" text-anchor="middle">FRAME ${cardData.image.id}</text></svg>`
+            `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750"><rect width="600" height="750" fill="#3e4140"/><text x="300" y="375" fill="#d6d0c4" font-family="Courier New, monospace" font-size="32" text-anchor="middle">FRAME ${frame.id}</text></svg>`
           )}`;
       };
 
-      modalImg.src =
-        cardData.image.src;
+      modalImg.src = frame.src;
+      modalImg.alt = `Fotografía ${frame.id} de la secuencia`;
+      modalTitle.innerText = `FRAME ${frame.id} / ARCHIVE`;
+      sequenceCount.textContent = `${modalSequenceIndex + 1} / ${modalSequence.length}`;
+    }
 
-      modalTitle.innerText =
-        cardData.element.dataset.label;
+    function openModal(cardData) {
+      modalSequence = cardData.image.sequence || [cardData.image];
+      modalSequenceIndex = 0;
+      showModalSequenceFrame();
+
+      sequencePrev.hidden = modalSequence.length < 2;
+      sequenceNext.hidden = modalSequence.length < 2;
+      sequenceCount.hidden = modalSequence.length < 2;
 
       modalPhrase.innerText =
         cardData.image.phrase
@@ -2757,6 +2576,18 @@
       'click',
       closeModal
     );
+
+    sequencePrev.addEventListener('click', () => {
+      modalSequenceIndex =
+        (modalSequenceIndex - 1 + modalSequence.length) % modalSequence.length;
+      showModalSequenceFrame();
+    });
+
+    sequenceNext.addEventListener('click', () => {
+      modalSequenceIndex =
+        (modalSequenceIndex + 1) % modalSequence.length;
+      showModalSequenceFrame();
+    });
 
 
     window.addEventListener(
