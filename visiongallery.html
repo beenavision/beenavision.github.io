@@ -638,6 +638,126 @@
     }
 
     /* =========================
+       PANTALLA DE CARGA
+    ========================= */
+
+    .loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: var(--paper);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity .55s ease, visibility .55s ease;
+    }
+
+    .loading-screen.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .loading-panel {
+      width: min(440px, 100%);
+      text-align: center;
+    }
+
+    .loading-kicker,
+    .loading-count {
+      font-size: 9px;
+      letter-spacing: 2px;
+      opacity: .65;
+    }
+
+    .loading-title {
+      margin: 13px 0 34px;
+      font-size: clamp(15px, 3vw, 21px);
+      font-weight: normal;
+      letter-spacing: 3px;
+    }
+
+    .flight-track {
+      position: relative;
+      height: 34px;
+      margin: 0 2px 13px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .flight-track::before,
+    .flight-track::after {
+      position: absolute;
+      bottom: -3px;
+      width: 5px;
+      height: 5px;
+      border: 1px solid var(--ink);
+      border-radius: 50%;
+      background: var(--paper);
+      content: "";
+    }
+
+    .flight-track::before { left: 0; }
+    .flight-track::after { right: 0; }
+
+    .flight-progress {
+      position: absolute;
+      left: 0;
+      right: 100%;
+      bottom: -1px;
+      height: 1px;
+      background: #3f8f5f;
+      transition: right .3s ease;
+    }
+
+    .flight-plane {
+      position: absolute;
+      left: 0;
+      bottom: 4px;
+      z-index: 1;
+      font-size: 23px;
+      line-height: 1;
+      transform: translate(-50%, 0) rotate(0deg);
+      transition: left .3s ease, transform .35s ease;
+      will-change: left, transform;
+    }
+
+    .loading-screen.landing .flight-plane {
+      transform: translate(-50%, 0) rotate(12deg);
+    }
+
+    .loading-screen.takeoff .flight-plane {
+      animation: planeTakeoff .7s ease-out both;
+    }
+
+    @keyframes planeTakeoff {
+      from { transform: translate(-50%, 8px) rotate(-12deg); }
+      to { transform: translate(-50%, 0) rotate(0deg); }
+    }
+
+    .loading-count {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .loading-percent {
+      color: #3f8f5f;
+      opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .loading-screen,
+      .flight-progress,
+      .flight-plane {
+        transition-duration: .01ms;
+        animation-duration: .01ms;
+      }
+    }
+
+    /* =========================
        VENTANA MODAL
     ========================= */
 
@@ -1199,6 +1319,25 @@
 
 
   <!-- =========================
+       PANTALLA DE CARGA
+  ========================= -->
+
+  <section class="loading-screen" id="loadingScreen" aria-hidden="true" aria-live="polite">
+    <div class="loading-panel">
+      <div class="loading-kicker">BAV / PHOTOGRAPHIC ARCHIVE</div>
+      <h1 class="loading-title" id="loadingTitle">PREPARING FLIGHT</h1>
+      <div class="flight-track" role="progressbar" aria-label="Carga de fotografías" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="flightTrack">
+        <div class="flight-progress" id="flightProgress"></div>
+        <span class="flight-plane" id="flightPlane" aria-hidden="true">✈</span>
+      </div>
+      <div class="loading-count">
+        <span id="loadingCount">LOADING FRAMES 0 / 0</span>
+        <span class="loading-percent" id="loadingPercent">0%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================
        VENTANA MODAL
   ========================= -->
 
@@ -1284,27 +1423,67 @@
       }, 1800);
     }
 
-    function enterArchive(name, archiveNumber, photos) {
+    async function preloadArchiveImages(photos, onProgress) {
+      let nextIndex = 0;
+      let completed = 0;
+      const concurrency = Math.min(4, photos.length);
+
+      const worker = async () => {
+        while (nextIndex < photos.length) {
+          const photo = photos[nextIndex++];
+          await new Promise(resolve => {
+            const image = new Image();
+            image.onload = resolve;
+            image.onerror = resolve;
+            image.src = photo.src;
+            if (image.complete) resolve();
+          });
+          completed++;
+          onProgress(completed, photos.length);
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: concurrency }, () => worker())
+      );
+    }
+
+    async function enterArchive(name, archiveNumber, photos) {
+      if (loadingScreen.classList.contains('active')) return;
+
       clearTimeout(mapStatusResetTimer);
-      document.body.classList.remove('grid-view');
-      isGridView = false;
-      modeToggle.innerText = 'MODE: 3D SPACE';
-      hint.style.display = 'block';
+      loadingTitle.textContent = `${name} / PREPARING FLIGHT`;
+      loadingScreen.classList.remove('landing');
+      loadingScreen.classList.add('active', 'takeoff');
+      loadingScreen.setAttribute('aria-hidden', 'false');
+      updateLoadingProgress(0, photos.length);
+      setTimeout(() => loadingScreen.classList.remove('takeoff'), 750);
+
+      await preloadArchiveImages(photos, updateLoadingProgress);
+      loadingScreen.classList.add('landing');
+      await new Promise(resolve => setTimeout(resolve, 650));
+
       activePhotos = photos;
       rebuildPhotoSpace();
+
+      isGridView = tabletOrSmallerQuery.matches;
+      document.body.classList.toggle('grid-view', isGridView);
+      modeToggle.innerText = isGridView ? 'MODE: GRID 2D' : 'MODE: 3D SPACE';
+      hint.style.display = isGridView ? 'none' : 'block';
+
+      if (isGridView) {
+        cards.forEach(loadCardImage);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+
       document.body.classList.add('archive-open');
+      loadingScreen.classList.remove('active');
+      loadingScreen.setAttribute('aria-hidden', 'true');
 
       mapStatus.innerHTML = `
         ${name} / ARCHIVE ${archiveNumber}
-        <span>LOADING PHOTOGRAPHIC SPACE</span>
+        <span>PHOTOGRAPHIC SPACE READY</span>
       `;
-
-      mapStatusResetTimer = setTimeout(() => {
-        mapStatus.innerHTML = `
-          SELECT ARCHIVE LOCATION
-          <span>03 LOCATIONS / 02 ACTIVE</span>
-        `;
-      }, 900);
     }
 
     locationSpain.addEventListener('click', () => {
@@ -1988,6 +2167,22 @@
     const modeToggle = document.querySelector('#modeToggle');
     const goBackButton = document.querySelector('#goBackButton');
     const hint = document.querySelector('#hint');
+    const loadingScreen = document.querySelector('#loadingScreen');
+    const loadingTitle = document.querySelector('#loadingTitle');
+    const loadingCount = document.querySelector('#loadingCount');
+    const loadingPercent = document.querySelector('#loadingPercent');
+    const flightTrack = document.querySelector('#flightTrack');
+    const flightProgress = document.querySelector('#flightProgress');
+    const flightPlane = document.querySelector('#flightPlane');
+
+    function updateLoadingProgress(completed, total) {
+      const percent = total ? Math.round((completed / total) * 100) : 100;
+      loadingCount.textContent = `LOADING FRAMES ${completed} / ${total}`;
+      loadingPercent.textContent = `${percent}%`;
+      flightTrack.setAttribute('aria-valuenow', percent);
+      flightProgress.style.right = `${100 - percent}%`;
+      flightPlane.style.left = `${percent}%`;
+    }
 
     const photoModal = document.querySelector('#photoModal');
     const modalOverlay = document.querySelector('#modalOverlay');
@@ -2236,9 +2431,10 @@
 
     let renderRunning = false;
     let renderFrame = null;
-    const preloadDistance = 5000;
-    const unloadDistance = 9000;
-
+    const preloadDistance = 14000;
+    const unloadDistance = 26000;
+    const tabletOrSmallerQuery = window.matchMedia('(max-width: 1024px)');
+    
     function requestRender() {
       if (renderRunning) return;
       renderRunning = true;
@@ -2257,6 +2453,11 @@
         card.imageLoading = false;
       };
       image.src = card.image.src;
+
+      if (image.complete && image.naturalWidth > 0) {
+        card.imageLoaded = true;
+        card.imageLoading = false;
+      }
     }
 
     function unloadCardImage(card) {
@@ -2382,6 +2583,7 @@
     function resize() {
       viewportWidth = window.innerWidth;
       viewportHeight = window.innerHeight;
+
       limitMapPan();
       requestRender();
     }
@@ -2395,10 +2597,7 @@
       renderRunning = false;
       renderFrame = null;
 
-      if (
-        isGridView ||
-        !document.body.classList.contains('archive-open')
-      ) return;
+      if (isGridView) return;
 
       const travelDelta = targetTravel - travel;
       const tiltTargetX = isHoveringCard ? 0 : targetTiltX;
@@ -2580,10 +2779,7 @@
       'mousemove',
       event => {
 
-        if (
-          isGridView ||
-          !document.body.classList.contains('archive-open')
-        ) return;
+        if (isGridView) return;
 
 
         const x =
@@ -2612,10 +2808,7 @@
       'touchstart',
       event => {
 
-        if (
-          isGridView ||
-          !document.body.classList.contains('archive-open')
-        ) return;
+        if (isGridView) return;
 
         touchStartY =
           event.touches[0].clientY;
@@ -2631,10 +2824,7 @@
       'touchmove',
       event => {
 
-        if (
-          isGridView ||
-          !document.body.classList.contains('archive-open')
-        ) return;
+        if (isGridView) return;
 
 
         const touchY =
@@ -2671,7 +2861,6 @@
 
         if (
           isGridView ||
-          !document.body.classList.contains('archive-open') ||
           !event.gamma ||
           !event.beta
         ) {
